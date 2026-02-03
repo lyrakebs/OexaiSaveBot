@@ -64,15 +64,15 @@ def handle_link(message):
 
     # ------ Видео и фото через yt-dlp ------
     try:
-        # Генерируем уникальное имя файла
-        unique_filename = f"{DOWNLOAD_DIR}/{uuid.uuid4()}.%(ext)s"
+        # Генерируем уникальное имя файла для каждого запроса
+        unique_filename_template = f"{DOWNLOAD_DIR}/{uuid.uuid4()}.%(ext)s"
         ydl_opts_updated = ydl_opts.copy()
-        ydl_opts_updated["outtmpl"] = unique_filename
+        ydl_opts_updated["outtmpl"] = unique_filename_template
 
         with yt_dlp.YoutubeDL(ydl_opts_updated) as ydl:
             info = ydl.extract_info(url, download=True)
 
-            # Если несколько видео/карусель
+            # Если несколько видео / карусель
             entries = info.get("entries")
             if entries:
                 for entry in entries:
@@ -93,12 +93,12 @@ def handle_link(message):
                         os.remove(filename)
                 return
 
-            # Одиночное медиа
+            # одиночное медиа
             filename = ydl.prepare_filename(info)
             if not filename.endswith(".mp4"):
                 filename = filename.rsplit(".", 1)[0] + ".mp4"
 
-        # Отправка файла
+        # Отправка одиночного файла
         with open(filename, "rb") as f:
             if info.get("duration"):  # видео
                 bot.send_video(chat_id, f, supports_streaming=True)
