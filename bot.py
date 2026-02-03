@@ -10,15 +10,17 @@ bot = telebot.TeleBot(TOKEN)
 DOWNLOAD_DIR = "downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-# ---------- YT-DLP OPTIONS ----------
+# ---------- YT-DLP OPTIONS (однопоточно, без FFmpeg для Pinterest) ----------
 ydl_opts = {
     "format": "bestvideo+bestaudio/best",
-    "merge_output_format": "mp4",
     "quiet": True,
     "noplaylist": True,
     "socket_timeout": 60,
     "retries": 5,
-    "continuedl": True
+    "continuedl": True,
+    "noprogress": True,
+    "concurrent_fragment_downloads": 1,  # однопоточное скачивание
+    "merge_output_format": "mp4"  # для видео
 }
 
 # ---------- START COMMAND ----------
@@ -42,7 +44,7 @@ def handle_link(message):
     # Расширяем ссылку
     url = expand_url(url)
 
-    # ------ TikTok фото ------
+    # ------ TikTok фото через TikWM ------
     if "tiktok.com" in url:
         try:
             api_data = download_from_tikwm(url, return_data=True)
@@ -72,7 +74,7 @@ def handle_link(message):
         with yt_dlp.YoutubeDL(ydl_opts_updated) as ydl:
             info = ydl.extract_info(url, download=True)
 
-            # Если несколько видео / карусель
+            # Проверка на несколько медиа (карусель)
             entries = info.get("entries")
             if entries:
                 for entry in entries:
@@ -93,7 +95,7 @@ def handle_link(message):
                         os.remove(filename)
                 return
 
-            # одиночное медиа
+            # Одиночное медиа
             filename = ydl.prepare_filename(info)
             if not filename.endswith(".mp4"):
                 filename = filename.rsplit(".", 1)[0] + ".mp4"
