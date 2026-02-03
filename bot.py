@@ -8,8 +8,6 @@ from main import TOKEN
 
 bot = telebot.TeleBot(TOKEN)
 DOWNLOAD_DIR = "downloads"
-
-os.environ["PATH"] += os.pathsep + os.path.join(os.getcwd(), "bin")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 # ---------- YT-DLP OPTIONS ----------
@@ -23,7 +21,7 @@ ydl_opts = {
     "continuedl": True
 }
 
-# ---------- START ----------
+# ---------- START COMMAND ----------
 @bot.message_handler(commands=["start"])
 def start(message):
     bot.send_message(
@@ -39,7 +37,7 @@ def start(message):
 def handle_link(message):
     chat_id = message.chat.id
     url = message.text.strip()
-    bot.send_message(chat_id, "⏳ Ожидайте, может потребоваться немного времени…")
+    bot.send_message(chat_id, "⏳ Ожидайте, скачивание может занять немного времени…")
 
     # Расширяем ссылку
     url = expand_url(url)
@@ -66,7 +64,7 @@ def handle_link(message):
 
     # ------ Видео и фото через yt-dlp ------
     try:
-        # Генерируем уникальный шаблон имени файла
+        # Генерируем уникальное имя файла
         unique_filename = f"{DOWNLOAD_DIR}/{uuid.uuid4()}.%(ext)s"
         ydl_opts_updated = ydl_opts.copy()
         ydl_opts_updated["outtmpl"] = unique_filename
@@ -74,41 +72,40 @@ def handle_link(message):
         with yt_dlp.YoutubeDL(ydl_opts_updated) as ydl:
             info = ydl.extract_info(url, download=True)
 
+            # Если несколько видео/карусель
             entries = info.get("entries")
-            if entries:  # несколько медиа
-                media = []
+            if entries:
                 for entry in entries:
                     filename = ydl.prepare_filename(entry)
                     if not filename.endswith(".mp4"):
                         filename = filename.rsplit(".", 1)[0] + ".mp4"
 
-                    if entry.get("duration"):  # видео
+                    # Видео
+                    if entry.get("duration"):
                         with open(filename, "rb") as f:
-                            bot.send_video(chat_id, f)
+                            bot.send_video(chat_id, f, supports_streaming=True)
                         os.remove(filename)
-                    else:  # фото
+                    else:  # Фото
                         with open(filename, "rb") as f:
                             bio = io.BytesIO(f.read())
                             bio.name = os.path.basename(filename)
-                            media.append(telebot.types.InputMediaPhoto(bio))
+                            bot.send_photo(chat_id, bio)
                         os.remove(filename)
-
-                if media:
-                    bot.send_media_group(chat_id, media)
                 return
 
-            # одиночное медиа
+            # Одиночное медиа
             filename = ydl.prepare_filename(info)
             if not filename.endswith(".mp4"):
                 filename = filename.rsplit(".", 1)[0] + ".mp4"
 
+        # Отправка файла
         with open(filename, "rb") as f:
-            if info.get("duration"):
-                bot.send_video(chat_id, f)
-            else:
+            if info.get("duration"):  # видео
+                bot.send_video(chat_id, f, supports_streaming=True)
+            else:  # фото
                 bio = io.BytesIO(f.read())
                 bio.name = os.path.basename(filename)
-                bot.send_document(chat_id, bio)
+                bot.send_photo(chat_id, bio)
         os.remove(filename)
 
     except yt_dlp.utils.DownloadError as e:
